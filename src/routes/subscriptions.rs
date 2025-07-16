@@ -1,7 +1,7 @@
 /*
  * @Date: 2025-07-12 16:14:33
  * @LastEditors: myclooe 994386508@qq.com
- * @LastEditTime: 2025-07-15 10:26:02
+ * @LastEditTime: 2025-07-16 10:57:07
  * @FilePath: /zero2prod/src/routes/subscriptions.rs
  */
 use actix_web::{
@@ -56,15 +56,16 @@ pub async fn insert_subscriber(
     pool: &PgPool,
     new_subscriber: &NewSubscriber,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query!(
-        r#"INSERT INTO subscriptions (id,email,name,subscribed_at)
-        VALUES ($1, $2, $3, $4)
+    sqlx::query! {
+        r#"INSERT INTO subscriptions (id,email,name,subscribed_at,status)
+        VALUES ($1, $2, $3, $4, $5)
         "#,
         uuid::Uuid::new_v4(),
         new_subscriber.email.as_ref(),
         new_subscriber.name.as_ref(),
-        chrono::Utc::now()
-    )
+        chrono::Utc::now(),
+        "confirmed"
+    }
     .execute(pool)
     .await
     .map_err(|e| {

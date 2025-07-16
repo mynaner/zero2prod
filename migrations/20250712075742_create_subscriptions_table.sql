@@ -1,7 +1,7 @@
  
 -- migrations/{timestamp}_create_subscriptions_table.sql
 -- 创建 subscriptions 表
-create table subscriptions(
+create table IF not exists subscriptions(
     id uuid not null, 
     primary key (id), 
     email text not null unique,
