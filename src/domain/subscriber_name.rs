@@ -1,7 +1,7 @@
 /*
  * @Date: 2025-07-14 23:26:53
  * @LastEditors: myclooe 994386508@qq.com
- * @LastEditTime: 2025-07-14 23:35:05
+ * @LastEditTime: 2025-07-17 10:00:15
  * @FilePath: /zero2prod/src/domain/subscriber_name.rs
  */
 use unicode_segmentation::UnicodeSegmentation;

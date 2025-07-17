@@ -1,8 +1,10 @@
+use actix_web::App;
 use serde_json::Value;
 use wiremock::{
     Mock, ResponseTemplate,
     matchers::{method, path},
 };
+use zero2prod::{domain::NewSubscriber, routes::subscriptions::FormData};
 
 use crate::helpers::spawn_app;
 
@@ -26,6 +28,28 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
         .expect("Failed to fetch saved subscription.");
     assert_eq!(saved.email, "994386502@qq.com");
     assert_eq!(saved.name, "deng xin");
+}
+
+#[tokio::test]
+async fn subscribe_persists_the_new_subscriber() {
+    let app = spawn_app().await;
+    let body = "name=deng%20xin&email=994386502%40qq.com";
+    Mock::given(path("/email"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&app.email_server)
+        .await;
+
+    // 执行
+    app.post_subscriptions(body.into()).await;
+
+    let saved = sqlx::query!("SELECT email,name,status FROM subscriptions")
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch saved subscriptions");
+
+    assert_eq!(saved.email, "994386502@qq.com");
+    assert_eq!(saved.name, "deng xin");
+    assert_eq!(saved.status, "pending_confirmation");
 }
 
 #[tokio::test]

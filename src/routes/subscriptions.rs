@@ -1,7 +1,7 @@
 /*
  * @Date: 2025-07-12 16:14:33
  * @LastEditors: myclooe 994386508@qq.com
- * @LastEditTime: 2025-07-16 14:26:22
+ * @LastEditTime: 2025-07-17 15:17:20
  * @FilePath: /zero2prod/src/routes/subscriptions.rs
  */
 use actix_web::{
@@ -103,7 +103,7 @@ pub async fn insert_subscriber(
         new_subscriber.email.as_ref(),
         new_subscriber.name.as_ref(),
         chrono::Utc::now(),
-        "confirmed"
+        "pending_confirmation"
     }
     .execute(pool)
     .await
