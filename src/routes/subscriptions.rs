@@ -1,7 +1,7 @@
 /*
  * @Date: 2025-07-12 16:14:33
  * @LastEditors: myclooe 994386508@qq.com
- * @LastEditTime: 2025-07-16 10:57:07
+ * @LastEditTime: 2025-07-16 14:26:22
  * @FilePath: /zero2prod/src/routes/subscriptions.rs
  */
 use actix_web::{
@@ -10,7 +10,10 @@ use actix_web::{
 };
 use sqlx::PgPool;
 
-use crate::domain::{NewSubscriber, SubScriberName, SubscriberEmail};
+use crate::{
+    domain::{NewSubscriber, SubScriberName, SubscriberEmail},
+    email_client::EmailClient,
+};
 #[derive(Debug, serde::Deserialize, PartialEq)]
 pub struct FormData {
     pub email: String,
@@ -35,21 +38,57 @@ impl TryFrom<FormData> for NewSubscriber {
 
 #[tracing::instrument(
     name = "Adding a new subscriber", 
-    skip(form, pool),
+    skip(form, pool,email_client),
     fields(
         subscriber_email=%form.email,
         subscriber_name=%form.name
     )
 )]
-pub async fn subscribe(form: web::Form<FormData>, pool: web::Data<PgPool>) -> HttpResponse {
-    let new_subscriber = match form.0.try_into() {
+pub async fn subscribe(
+    form: web::Form<FormData>,
+    pool: web::Data<PgPool>,
+    email_client: web::Data<EmailClient>,
+) -> HttpResponse {
+    let new_subscriber: NewSubscriber = match form.0.try_into() {
         Ok(e) => e,
         Err(e) => return HttpResponse::BadRequest().body(e),
     };
-    match insert_subscriber(&pool, &new_subscriber).await {
-        Ok(_) => HttpResponse::Ok().finish(),
-        Err(_) => HttpResponse::InternalServerError().finish(),
+
+    if insert_subscriber(&pool, &new_subscriber).await.is_err() {
+        println!("insert_subscriber err");
+        return HttpResponse::InternalServerError().finish();
     }
+
+    if send_confirmation_email(&email_client, new_subscriber)
+        .await
+        .is_err()
+    {
+        return HttpResponse::InternalServerError().finish();
+    }
+    return HttpResponse::Ok().finish();
+}
+
+#[tracing::instrument(
+    name = "send a confirmation email to a new subscriber",
+    skip(email_client, new_subscriber)
+)]
+pub async fn send_confirmation_email(
+    email_client: &EmailClient,
+    new_subscriber: NewSubscriber,
+) -> Result<(), reqwest::Error> {
+    let link = "https://my-api.com/subscriptions/confirm";
+    let html_body = format!(
+        "Welcomme to newsletter!<br/>Click <a herf=\"{}\">here</a>to confirm you subscription",
+        link
+    );
+    let text_body = format!(
+        "Welcomme to newsletter! Vlist {} to confirm you subscription",
+        link
+    );
+
+    email_client
+        .send_email(new_subscriber.email, "Welcomme !", &html_body, &text_body)
+        .await
 }
 
 pub async fn insert_subscriber(

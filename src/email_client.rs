@@ -1,7 +1,7 @@
 /*
  * @Date: 2025-07-15 10:36:14
  * @LastEditors: myclooe 994386508@qq.com
- * @LastEditTime: 2025-07-15 22:22:59
+ * @LastEditTime: 2025-07-16 11:53:08
  * @FilePath: /zero2prod/src/email_client.rs
  */
 

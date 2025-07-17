@@ -1,12 +1,13 @@
 /*
  * @Date: 2025-07-15 22:34:51
  * @LastEditors: myclooe 994386508@qq.com
- * @LastEditTime: 2025-07-16 10:38:44
+ * @LastEditTime: 2025-07-16 11:17:42
  * @FilePath: /zero2prod/tests/api/helpers.rs
  */
 use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
+use wiremock::MockServer;
 use zero2prod::configuration::DatabaseSettings;
 use zero2prod::configuration::get_configuration;
 use zero2prod::startup::{Application, get_connection_pool};
@@ -15,6 +16,8 @@ use zero2prod::telemetry::{get_subscriber, init_subscriber};
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
+    // 启动一个模拟服务器,替代PostMark API
+    pub email_server: MockServer,
 }
 
 impl TestApp {
@@ -45,11 +48,12 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 
 pub async fn spawn_app() -> TestApp {
     Lazy::force(&TRACING);
-
+    let email_server = MockServer::start().await;
     let configuration = {
         let mut config = get_configuration().expect("failed to read configuration");
         config.database.database_name = Uuid::new_v4().to_string();
         config.application.port = 0;
+        config.email_client.base_url = email_server.uri();
         config
     };
 
@@ -61,9 +65,11 @@ pub async fn spawn_app() -> TestApp {
 
     let address = format!("127.0.0.1:{}", application.port());
     let _ = tokio::spawn(application.run_until_stoppend());
+
     TestApp {
         address,
         db_pool: get_connection_pool(&configuration.database),
+        email_server,
     }
 }
 
