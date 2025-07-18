@@ -1,7 +1,7 @@
 /*
  * @Date: 2025-07-12 16:14:33
  * @LastEditors: myclooe 994386508@qq.com
- * @LastEditTime: 2025-07-17 15:17:20
+ * @LastEditTime: 2025-07-18 09:58:27
  * @FilePath: /zero2prod/src/routes/subscriptions.rs
  */
 use actix_web::{
@@ -13,6 +13,7 @@ use sqlx::PgPool;
 use crate::{
     domain::{NewSubscriber, SubScriberName, SubscriberEmail},
     email_client::EmailClient,
+    startup::ApplicationBaseUrl,
 };
 #[derive(Debug, serde::Deserialize, PartialEq)]
 pub struct FormData {
@@ -38,7 +39,7 @@ impl TryFrom<FormData> for NewSubscriber {
 
 #[tracing::instrument(
     name = "Adding a new subscriber", 
-    skip(form, pool,email_client),
+    skip(form, pool,email_client,base_url),
     fields(
         subscriber_email=%form.email,
         subscriber_name=%form.name
@@ -47,6 +48,7 @@ impl TryFrom<FormData> for NewSubscriber {
 pub async fn subscribe(
     form: web::Form<FormData>,
     pool: web::Data<PgPool>,
+    base_url: web::Data<ApplicationBaseUrl>,
     email_client: web::Data<EmailClient>,
 ) -> HttpResponse {
     let new_subscriber: NewSubscriber = match form.0.try_into() {
@@ -59,7 +61,7 @@ pub async fn subscribe(
         return HttpResponse::InternalServerError().finish();
     }
 
-    if send_confirmation_email(&email_client, new_subscriber)
+    if send_confirmation_email(&email_client, new_subscriber, &base_url)
         .await
         .is_err()
     {
@@ -70,13 +72,17 @@ pub async fn subscribe(
 
 #[tracing::instrument(
     name = "send a confirmation email to a new subscriber",
-    skip(email_client, new_subscriber)
+    skip(email_client, new_subscriber, base_url)
 )]
 pub async fn send_confirmation_email(
     email_client: &EmailClient,
     new_subscriber: NewSubscriber,
+    base_url: &ApplicationBaseUrl,
 ) -> Result<(), reqwest::Error> {
-    let link = "https://my-api.com/subscriptions/confirm";
+    let link = format!(
+        "{}/subscriptions/confirm?subscription_token=mytoken",
+        base_url.0
+    );
     let html_body = format!(
         "Welcomme to newsletter!<br/>Click <a herf=\"{}\">here</a>to confirm you subscription",
         link

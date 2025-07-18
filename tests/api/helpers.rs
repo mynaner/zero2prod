@@ -1,7 +1,7 @@
 /*
  * @Date: 2025-07-15 22:34:51
  * @LastEditors: myclooe 994386508@qq.com
- * @LastEditTime: 2025-07-16 11:17:42
+ * @LastEditTime: 2025-07-18 10:46:13
  * @FilePath: /zero2prod/tests/api/helpers.rs
  */
 use once_cell::sync::Lazy;
@@ -10,6 +10,8 @@ use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod::configuration::DatabaseSettings;
 use zero2prod::configuration::get_configuration;
+use zero2prod::email_client;
+use zero2prod::email_client::EmailClient;
 use zero2prod::startup::{Application, get_connection_pool};
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
@@ -18,6 +20,13 @@ pub struct TestApp {
     pub db_pool: PgPool,
     // 启动一个模拟服务器,替代PostMark API
     pub email_server: MockServer,
+    pub prot: u16,
+    pub database_name: String,
+}
+
+pub struct ConfirmationLink {
+    pub html: reqwest::Url,
+    pub plain_text: reqwest::Url,
 }
 
 impl TestApp {
@@ -29,6 +38,32 @@ impl TestApp {
             .send()
             .await
             .expect("failed to execute request.")
+    }
+
+    pub fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLink {
+        let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
+        let get_link = |s: &str| {
+            let links: Vec<_> = linkify::LinkFinder::new()
+                .links(s)
+                .filter(|l| linkify::LinkKind::Url == *l.kind())
+                .collect();
+            assert_eq!(links.len(), 1);
+            let row_link = links[0].as_str().to_owned();
+            let mut confirmation_link = reqwest::Url::parse(&row_link).unwrap();
+            confirmation_link.set_port(Some(self.prot)).unwrap();
+            confirmation_link
+        };
+
+        let html = get_link(&body["HtmlBody"].as_str().unwrap());
+        let plain_text = get_link(&body["TextBody"].as_str().unwrap());
+        ConfirmationLink { html, plain_text }
+    }
+
+    pub async fn drop_database(&self) {
+        self.db_pool
+            .execute(format!(r#"drop database "{}";"#, self.database_name).as_str())
+            .await
+            .unwrap();
     }
 }
 
@@ -64,12 +99,15 @@ pub async fn spawn_app() -> TestApp {
         .expect("failed to build application.");
 
     let address = format!("127.0.0.1:{}", application.port());
+    let application_port = application.port();
     let _ = tokio::spawn(application.run_until_stoppend());
 
     TestApp {
         address,
         db_pool: get_connection_pool(&configuration.database),
         email_server,
+        prot: application_port,
+        database_name: configuration.database.database_name,
     }
 }
 

@@ -1,7 +1,8 @@
+use core::str;
 /*
  * @Date: 2025-07-16 10:45:18
  * @LastEditors: myclooe 994386508@qq.com
- * @LastEditTime: 2025-07-17 15:42:26
+ * @LastEditTime: 2025-07-17 23:23:51
  * @FilePath: /zero2prod/src/startup.rs
  */
 use std::net::TcpListener;
@@ -11,7 +12,7 @@ use sqlx::{PgPool, postgres::PgPoolOptions};
 use tracing_actix_web::TracingLogger;
 
 use crate::{
-    configuration::{DatabaseSettings, Settings},
+    configuration::{self, DatabaseSettings, Settings},
     email_client::EmailClient,
     routes::{
         health_check::health_check, subscriptions::subscribe,
@@ -23,6 +24,8 @@ pub struct Application {
     port: u16,
     server: Server,
 }
+
+pub struct ApplicationBaseUrl(pub String);
 
 impl Application {
     pub async fn build(config: &Settings) -> Result<Self, std::io::Error> {
@@ -44,7 +47,12 @@ impl Application {
         let listener = TcpListener::bind(address)?;
 
         let port = listener.local_addr().unwrap().port();
-        let server = run(listener, connection_pool, email_client)?;
+        let server = run(
+            listener,
+            connection_pool,
+            email_client,
+            config.application.base_url.clone(),
+        )?;
         Ok(Self { port, server })
     }
 
@@ -67,9 +75,11 @@ pub fn run(
     listener: TcpListener,
     db_pool: PgPool,
     email_client: EmailClient,
+    base_url: String,
 ) -> Result<Server, std::io::Error> {
     let db_pool = web::Data::new(db_pool);
     let email_client = web::Data::new(email_client);
+    let base_url = web::Data::new(ApplicationBaseUrl(base_url));
     let server = HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
@@ -81,6 +91,7 @@ pub fn run(
             )
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
+            .app_data(base_url.clone())
     })
     .listen(listener)?
     .run();
