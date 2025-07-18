@@ -2,7 +2,7 @@ use core::str;
 /*
  * @Date: 2025-07-16 10:45:18
  * @LastEditors: myclooe 994386508@qq.com
- * @LastEditTime: 2025-07-17 23:23:51
+ * @LastEditTime: 2025-07-18 15:58:49
  * @FilePath: /zero2prod/src/startup.rs
  */
 use std::net::TcpListener;
@@ -15,8 +15,7 @@ use crate::{
     configuration::{self, DatabaseSettings, Settings},
     email_client::EmailClient,
     routes::{
-        health_check::health_check, subscriptions::subscribe,
-        subscriptions_confirm::subscriptions_confirm,
+        health_check::health_check, subscriptions::subscribe, subscriptions_confirm::confirm,
     },
 };
 
@@ -85,10 +84,7 @@ pub fn run(
             .wrap(TracingLogger::default())
             .route("/health_check", web::get().to(health_check))
             .route("/subscriptions", web::post().to(subscribe))
-            .route(
-                "/subscriptions/confirm",
-                web::get().to(subscriptions_confirm),
-            )
+            .route("/subscriptions/confirm", web::get().to(confirm))
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
             .app_data(base_url.clone())

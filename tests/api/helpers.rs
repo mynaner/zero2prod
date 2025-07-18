@@ -1,7 +1,7 @@
 /*
  * @Date: 2025-07-15 22:34:51
  * @LastEditors: myclooe 994386508@qq.com
- * @LastEditTime: 2025-07-18 10:46:13
+ * @LastEditTime: 2025-07-18 17:37:23
  * @FilePath: /zero2prod/tests/api/helpers.rs
  */
 use once_cell::sync::Lazy;
@@ -59,11 +59,10 @@ impl TestApp {
         ConfirmationLink { html, plain_text }
     }
 
-    pub async fn drop_database(&self) {
-        self.db_pool
-            .execute(format!(r#"drop database "{}";"#, self.database_name).as_str())
-            .await
-            .unwrap();
+    pub fn drop_database(&self) {
+        let _ = self
+            .db_pool
+            .execute(format!(r#"drop database "{}";"#, self.database_name).as_str());
     }
 }
 
