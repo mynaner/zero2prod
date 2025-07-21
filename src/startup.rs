@@ -1,8 +1,7 @@
-use core::str;
 /*
  * @Date: 2025-07-16 10:45:18
  * @LastEditors: myclooe 994386508@qq.com
- * @LastEditTime: 2025-07-18 15:58:49
+ * @LastEditTime: 2025-07-20 20:17:20
  * @FilePath: /zero2prod/src/startup.rs
  */
 use std::net::TcpListener;
@@ -12,10 +11,11 @@ use sqlx::{PgPool, postgres::PgPoolOptions};
 use tracing_actix_web::TracingLogger;
 
 use crate::{
-    configuration::{self, DatabaseSettings, Settings},
+    configuration::{DatabaseSettings, Settings},
     email_client::EmailClient,
     routes::{
-        health_check::health_check, subscriptions::subscribe, subscriptions_confirm::confirm,
+        health_check::health_check, newsletters::publish_newsletters, subscriptions::subscribe,
+        subscriptions_confirm::confirm,
     },
 };
 
@@ -85,6 +85,7 @@ pub fn run(
             .route("/health_check", web::get().to(health_check))
             .route("/subscriptions", web::post().to(subscribe))
             .route("/subscriptions/confirm", web::get().to(confirm))
+            .route("/newsletters", web::post().to(publish_newsletters))
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
             .app_data(base_url.clone())

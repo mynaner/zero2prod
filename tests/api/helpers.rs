@@ -1,7 +1,7 @@
 /*
  * @Date: 2025-07-15 22:34:51
  * @LastEditors: myclooe 994386508@qq.com
- * @LastEditTime: 2025-07-18 17:37:23
+ * @LastEditTime: 2025-07-20 21:41:22
  * @FilePath: /zero2prod/tests/api/helpers.rs
  */
 use once_cell::sync::Lazy;
@@ -10,8 +10,6 @@ use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod::configuration::DatabaseSettings;
 use zero2prod::configuration::get_configuration;
-use zero2prod::email_client;
-use zero2prod::email_client::EmailClient;
 use zero2prod::startup::{Application, get_connection_pool};
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
@@ -21,7 +19,7 @@ pub struct TestApp {
     // 启动一个模拟服务器,替代PostMark API
     pub email_server: MockServer,
     pub prot: u16,
-    pub database_name: String,
+    // pub database_name: String,
 }
 
 pub struct ConfirmationLink {
@@ -32,7 +30,7 @@ pub struct ConfirmationLink {
 impl TestApp {
     pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
         reqwest::Client::new()
-            .post(format!("http://{}/subscriptions", &self.address))
+            .post(format!("{}/subscriptions", &self.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(body)
             .send()
@@ -59,11 +57,20 @@ impl TestApp {
         ConfirmationLink { html, plain_text }
     }
 
-    pub fn drop_database(&self) {
-        let _ = self
-            .db_pool
-            .execute(format!(r#"drop database "{}";"#, self.database_name).as_str());
+    pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(format!("{}/newsletters", self.address))
+            .json(&body)
+            .send()
+            .await
+            .expect("failed to execute request.")
     }
+
+    // pub fn drop_database(&self) {
+    //     let _ = self
+    //         .db_pool
+    //         .execute(format!(r#"drop database "{}";"#, self.database_name).as_str());
+    // }
 }
 
 // 使用 once_cell 确保 tracing 栈堆中只被初始化一次
@@ -80,6 +87,7 @@ static TRACING: Lazy<()> = Lazy::new(|| {
     }
 });
 
+/// 启动一个新的应用程序,并运行在空的数据库之上
 pub async fn spawn_app() -> TestApp {
     Lazy::force(&TRACING);
     let email_server = MockServer::start().await;
@@ -97,7 +105,7 @@ pub async fn spawn_app() -> TestApp {
         .await
         .expect("failed to build application.");
 
-    let address = format!("127.0.0.1:{}", application.port());
+    let address = format!("http://127.0.0.1:{}", application.port());
     let application_port = application.port();
     let _ = tokio::spawn(application.run_until_stoppend());
 
@@ -106,7 +114,7 @@ pub async fn spawn_app() -> TestApp {
         db_pool: get_connection_pool(&configuration.database),
         email_server,
         prot: application_port,
-        database_name: configuration.database.database_name,
+        // database_name: configuration.database.database_name,
     }
 }
 
