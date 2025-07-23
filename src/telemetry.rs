@@ -1,3 +1,10 @@
+/*
+ * @Date: 2025-07-13 11:27:17
+ * @LastEditors: myclooe 994386508@qq.com
+ * @LastEditTime: 2025-07-23 09:47:24
+ * @FilePath: /zero2prod/src/telemetry.rs
+ */
+use tokio::task::JoinHandle;
 use tracing::{Subscriber, subscriber::set_global_default};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
@@ -34,4 +41,13 @@ pub fn init_subscriber(subscriber: impl Subscriber + Send + Sync) {
     LogTracer::init().expect("failed to set Logger");
     // 可以用于指定处理跨度订阅器
     set_global_default(subscriber).expect("Failed to set subscriber");
+}
+
+pub fn spawn_blocking_with_tractiong<F, R>(f: F) -> JoinHandle<R>
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    let current_span = tracing::Span::current();
+    tokio::task::spawn_blocking(move || current_span.in_scope(f))
 }
